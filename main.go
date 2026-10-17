@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"syscall"
+	"path/filepath"
 )
 
 func main() {
@@ -31,7 +32,8 @@ func run() {
 
 
 	cmd.SysProcAttr = &syscall.SysProcAttr {
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+		Unshareflags: syscall.CLONE_NEWNS,
 	}
 
 	cmd.Stdin = os.Stdin
@@ -39,6 +41,10 @@ func run() {
 	cmd.Stderr = os.Stderr
 
 	err := cmd.Run()
+
+	errHandle(err)
+
+	err = os.Remove(filepath.Join("/sys/fs/cgroup", "my-container"))
 
 	errHandle(err)
 
@@ -50,6 +56,8 @@ func child() {
 	err := syscall.Sethostname([]byte("my-container"))
 
 	errHandle(err)
+
+	cg()
 
 	err = syscall.Chroot("alpine-fs")
 
@@ -83,4 +91,22 @@ func errHandle(err error) {
 		panic(err)
 	}
 
+}
+
+func cg() {
+	newpath := filepath.Join("/sys/fs/cgroup", "my-container")
+
+	err := os.Mkdir(newpath, 0755)
+
+	if err != nil && !os.IsExist(err) {
+		errHandle(err)
+	}
+
+	err = os.WriteFile(filepath.Join(newpath, "pids.max"), []byte("20"), 0700)
+
+	errHandle(err)
+
+	err = os.WriteFile(filepath.Join(newpath, "cgroup.procs"), []byte("0"), 0700)
+
+	errHandle(err)
 }
