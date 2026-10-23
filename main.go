@@ -40,11 +40,9 @@ func run() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
+	defer os.Remove(filepath.Join("/sys/fs/cgroup", "my-container"))
+
 	err := cmd.Run()
-
-	errHandle(err)
-
-	err = os.Remove(filepath.Join("/sys/fs/cgroup", "my-container"))
 
 	errHandle(err)
 
@@ -71,6 +69,8 @@ func child() {
 
 	errHandle(err)
 
+	defer syscall.Unmount("proc", 0)
+
 	cmd := exec.Command(os.Args[2], os.Args[3:]...)
 
 	cmd.Stdin = os.Stdin
@@ -81,9 +81,6 @@ func child() {
 
 	errHandle(err)
 
-	err = syscall.Unmount("proc", 0)
-
-	errHandle(err)
 }
 
 func errHandle(err error) {
@@ -106,7 +103,17 @@ func cg() {
 
 	errHandle(err)
 
+	
+	err = os.WriteFile(filepath.Join(newpath, "memory.max"), []byte("20M"), 0700)
+	
+	errHandle(err)
+	
+	err = os.WriteFile(filepath.Join(newpath, "memory.swap.max"), []byte("0"), 0700)
+	
+	errHandle(err)
+
 	err = os.WriteFile(filepath.Join(newpath, "cgroup.procs"), []byte("0"), 0700)
 
 	errHandle(err)
+
 }
